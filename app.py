@@ -1,7 +1,10 @@
 import os
-
+import imdb
 import openai
+
 from flask import Flask, redirect, render_template, request, url_for
+
+IMDB = imdb.IMDb()
 
 app = Flask(__name__)
 openai.api_key = os.getenv("OPENAI_API_KEY")
@@ -10,26 +13,35 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 @app.route("/", methods=("GET", "POST"))
 def index():
     if request.method == "POST":
-        animal = request.form["animal"]
+
+        movieName = request.form["Movie"]
+
+        search = IMDB.search_movie(movieName)
+
+        id = search[0].movieID
+
+        movie = IMDB.get_movie(id)
+
+        movieDic = dict(movie)
+
+        Plot = ""
+
+        Plot += movieDic["plot"][0]
+        
+        print(Plot)
+
         response = openai.Completion.create(
             model="text-davinci-002",
-            prompt=generate_prompt(animal),
-            temperature=0.6,
+            prompt=generate_prompt(Plot),
+            temperature=1,
+            max_tokens = 4000,
         )
-        return redirect(url_for("index", result=response.choices[0].text))
+
+        return redirect(url_for("index", result=Plot + " " + response.choices[0].text))
 
     result = request.args.get("result")
     return render_template("index.html", result=result)
 
 
-def generate_prompt(animal):
-    return """Suggest three names for an animal that is a superhero.
-
-Animal: Cat
-Names: Captain Sharpclaw, Agent Fluffball, The Incredible Feline
-Animal: Dog
-Names: Ruff the Protector, Wonder Canine, Sir Barks-a-Lot
-Animal: {}
-Names:""".format(
-        animal.capitalize()
-    )
+def generate_prompt(Plot):
+    return """Continue the story of the movie from a given plot summary: """ + Plot
